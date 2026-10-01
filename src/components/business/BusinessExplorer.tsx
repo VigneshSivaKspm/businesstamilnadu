@@ -110,7 +110,7 @@ export function BusinessExplorer({
             )}
           </p>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Button
               variant="secondary"
               size="sm"
@@ -129,11 +129,12 @@ export function BusinessExplorer({
             <label htmlFor="sort-results" className="sr-only">
               Sort results
             </label>
+            <div className="min-w-0 flex-1 sm:flex-none">
             <SelectControl
               id="sort-results"
               value={filters.sort}
               onChange={(e) => update({ sort: e.target.value as SortOption })}
-              className="h-10 w-44 text-sm"
+              className="h-10 w-full text-sm sm:w-44"
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -141,6 +142,7 @@ export function BusinessExplorer({
                 </option>
               ))}
             </SelectControl>
+            </div>
             <div className="hidden rounded-control border border-line bg-white p-0.5 sm:flex" role="group" aria-label="Layout">
               {(
                 [
