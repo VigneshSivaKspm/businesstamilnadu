@@ -161,6 +161,8 @@ export interface Business {
   /** True for fictional sample listings shown before real data is connected. */
   isDemo?: boolean;
   ownerId?: string;
+  /** Registration this listing was created from, if any. */
+  registrationId?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -242,13 +244,21 @@ export interface RegistrationInput {
   confirmAccuracy: boolean;
 }
 
+export type RegistrationStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Registration extends Omit<RegistrationInput, 'confirmAccuracy'> {
   id: string;
   reference: string;
-  status: ListingStatus;
+  status: RegistrationStatus;
   submittedAt: ISODateString;
   /** Where the submission currently lives. */
   storage: 'local' | 'remote';
+  /** Admin review fields. */
+  reviewedAt?: ISODateString;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  notes?: string;
+  businessId?: string;
 }
 
 export interface ContactMessageInput {
@@ -259,15 +269,49 @@ export interface ContactMessageInput {
   message: string;
 }
 
+export type MessageStatus = 'new' | 'read' | 'archived';
+
 export interface ContactMessage extends ContactMessageInput {
   id: string;
   createdAt: ISODateString;
   storage: 'local' | 'remote';
+  status?: MessageStatus;
+  /** Listing the message refers to (e.g. claim requests). */
+  businessSlug?: string;
 }
 
 /* Prepared for future collections: users, reviews, leads, plans, payments. */
 
 export type UserRole = 'visitor' | 'owner' | 'admin';
+
+/* ------------------------------------------------------------------ */
+/* Admin                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin';
+  lastLoginAt?: ISODateString;
+}
+
+export interface AdminStats {
+  registrations: Record<RegistrationStatus, number>;
+  messages: Record<MessageStatus, number>;
+  businesses: { total: number; approved: number; suspended: number; verified: number; featured: number; demo: number };
+}
+
+export interface ActivityEntry {
+  id: string;
+  at: ISODateString;
+  adminId: string;
+  adminName: string;
+  action: string;
+  targetType: 'business' | 'registration' | 'message' | 'admin';
+  targetId: string;
+  summary: string;
+}
 
 export interface UserProfile {
   id: string;

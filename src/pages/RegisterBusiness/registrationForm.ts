@@ -37,6 +37,18 @@ export const STEPS = [
   { id: 'review', title: 'Review & Submit', short: 'Review' },
 ] as const;
 
+const STEP_FIELDS: Array<Array<keyof RegistrationInput>> = [
+  ['businessName', 'categoryId', 'subcategoryId', 'yearEstablished', 'shortDescription'],
+  ['district', 'city', 'locality', 'address', 'pinCode'],
+  ['contactPerson', 'phone', 'whatsapp', 'email', 'website'],
+  ['services', 'openingHours', 'serviceAreas'],
+  ['logoFileName', 'coverFileName', 'galleryFileNames'],
+  ['confirmAccuracy'],
+];
+
+/** Which form step a field lives on (for routing server-side errors). */
+export const stepOfField = (field: string) => STEP_FIELDS.findIndex((fields) => fields.includes(field as keyof RegistrationInput));
+
 export const DESCRIPTION_MIN = 30;
 export const DESCRIPTION_MAX = 300;
 

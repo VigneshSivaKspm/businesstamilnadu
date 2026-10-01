@@ -12,6 +12,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { breadcrumbSchema } from '@/lib/schema';
 import { categoryService, districtService, registrationService } from '@/services';
 import type { Registration, RegistrationInput } from '@/types';
+import { ApiError } from '@/lib/api';
 import { whatsappHref } from '@/utils/format';
 import { MediaStep, type MediaFiles } from './MediaStep';
 import {
@@ -20,6 +21,7 @@ import {
   emptyRegistration,
   summarize,
   validateStep,
+  stepOfField,
   type FormErrors,
 } from './registrationForm';
 
@@ -56,18 +58,20 @@ function SuccessPanel({ registration, onReset }: { registration: Registration; o
   const district = districtService.getDistrict(registration.district)?.name ?? '';
   const body = `Reference: ${registration.reference}\n\n${summarize({ ...registration, confirmAccuracy: true }, { category, subcategory, district })}`;
   const subject = `New business listing — ${registration.businessName} (${registration.reference})`;
+  const remote = registration.storage === 'remote';
 
   return (
     <div className="rounded-2xl border border-line bg-white p-6 text-center sm:p-10" role="status" aria-live="polite">
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/50">
         <CircleCheck className="size-7" aria-hidden />
       </span>
-      <h2 className="text-h2 mt-6">Details saved</h2>
+      <h2 className="text-h2 mt-6">{remote ? 'Submitted for review' : 'Details saved'}</h2>
       <p className="text-body mx-auto mt-3 max-w-lg text-navy-600">
-        Thank you. <strong>{registration.businessName}</strong> has been saved with reference{' '}
+        Thank you. <strong>{registration.businessName}</strong> has been {remote ? 'received' : 'saved'} with reference{' '}
         <strong className="font-mono text-navy-950">{registration.reference}</strong>.
+        {remote && ' Our team will review the details and may call the number you provided before the listing goes live.'}
       </p>
-      {!registrationService.isRemoteEnabled && (
+      {!remote && (
         <div className="mx-auto mt-6 max-w-lg rounded-xl border border-gold-200 bg-gold-50 p-4 text-left text-sm text-gold-700">
           <p className="font-semibold">One more step to reach our team</p>
           <p className="mt-1">
@@ -76,6 +80,7 @@ function SuccessPanel({ registration, onReset }: { registration: Registration; o
           </p>
         </div>
       )}
+      {!remote && (
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
         <Button
           href={`mailto:${site.contact.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
@@ -92,6 +97,7 @@ function SuccessPanel({ registration, onReset }: { registration: Registration; o
           Send on WhatsApp
         </Button>
       </div>
+      )}
       <div className="mt-8 flex justify-center gap-6 border-t border-line pt-6 text-sm">
         <button type="button" onClick={onReset} className="font-semibold text-brand-700 hover:text-navy-950">
           List another business
@@ -115,6 +121,7 @@ export default function RegisterBusinessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [result, setResult] = useState<Registration | null>(null);
+  const [honeypot, setHoneypot] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -177,16 +184,33 @@ export default function RegisterBusinessPage() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const registration = await registrationService.submit({
-        ...values,
-        logoFileName: media.logo[0]?.name ?? '',
-        coverFileName: media.cover[0]?.name ?? '',
-        galleryFileNames: media.gallery.map((f) => f.name),
-      });
+      const registration = await registrationService.submit(
+        {
+          ...values,
+          logoFileName: media.logo[0]?.name ?? '',
+          coverFileName: media.cover[0]?.name ?? '',
+          galleryFileNames: media.gallery.map((f) => f.name),
+        },
+        honeypot,
+      );
       setResult(registration);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {
-      setSubmitError('We couldn’t save your details. Please try again, or email us directly.');
+    } catch (error) {
+      // Server-side validation: show field errors on the step they belong to.
+      if (error instanceof ApiError && Object.keys(error.fields).length) {
+        const fields = error.fields as FormErrors;
+        const target = STEPS.findIndex((_, i) => Object.keys(fields).some((f) => stepOfField(f) === i));
+        if (target >= 0 && target !== step) goTo(target);
+        setErrors(fields);
+        focusFirstError(fields);
+        setSubmitError(error.message);
+      } else {
+        setSubmitError(
+          error instanceof ApiError && error.status === 429
+            ? error.message
+            : `We couldn’t submit your details. Please try again, or email ${site.contact.email}.`,
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -230,12 +254,19 @@ export default function RegisterBusinessPage() {
             {result ? (
               <SuccessPanel registration={result} onReset={reset} />
             ) : (
-              <form ref={formRef} onSubmit={onSubmit} noValidate className="scroll-mt-24 rounded-2xl border border-line bg-white shadow-soft">
+              <form ref={formRef} onSubmit={onSubmit} noValidate className="relative scroll-mt-24 rounded-2xl border border-line bg-white shadow-soft">
                 <div className="border-b border-line px-5 py-5 sm:px-8">
                   <Stepper steps={STEPS} current={step} reached={reached} onSelect={goTo} />
                 </div>
 
                 <div className="px-5 py-7 sm:px-8 sm:py-8">
+                  {/* Honeypot: hidden from people and assistive tech; bots tend to fill it. */}
+                  <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+                    <label>
+                      Company website
+                      <input type="text" name="company_url" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+                    </label>
+                  </div>
                   {restored && step === 0 && (
                     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-navy-50 px-4 py-3 text-sm text-navy-700">
                       <span>We restored your unfinished draft from this device.</span>
@@ -401,16 +432,16 @@ export default function RegisterBusinessPage() {
                           error={errors.confirmAccuracy}
                           onChange={(e) => set('confirmAccuracy', e.target.checked)}
                         />
-                        {submitError && (
-                          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
-                            {submitError}
-                          </p>
-                        )}
                       </div>
                     )}
                   </div>
                 </div>
 
+                {submitError && (
+                  <p className="mx-5 mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:mx-8" role="alert">
+                    {submitError}
+                  </p>
+                )}
                 <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4 sm:px-8">
                   {step > 0 ? (
                     <Button variant="ghost" onClick={() => goTo(step - 1)} leftIcon={<ArrowLeft className="size-4" aria-hidden />}>

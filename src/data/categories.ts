@@ -1,5 +1,6 @@
-import { slugify } from '@/lib/slug';
-import type { Category, CategoryIconKey, Subcategory } from '@/types';
+// Relative value imports keep this file loadable by the API server (Node type stripping has no path aliases).
+import { slugify } from '../lib/slug.ts';
+import type { Category, CategoryIconKey, Subcategory } from '../types/index.ts';
 
 interface CategorySeed {
   name: string;

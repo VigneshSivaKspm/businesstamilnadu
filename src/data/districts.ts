@@ -1,5 +1,6 @@
-import { slugify } from '@/lib/slug';
-import type { District, Region } from '@/types';
+// Relative value imports keep this file loadable by the API server (Node type stripping has no path aliases).
+import { slugify } from '../lib/slug.ts';
+import type { District, Region } from '../types/index.ts';
 
 type DistrictSeed = [
   name: string,

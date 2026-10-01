@@ -8,6 +8,7 @@ import { SEO } from '@/components/common/SEO';
 import { SelectField, TextAreaField, TextField } from '@/components/forms/Field';
 import { site } from '@/config/site';
 import { breadcrumbSchema } from '@/lib/schema';
+import { ApiError } from '@/lib/api';
 import { contactService } from '@/services';
 import type { ContactMessageInput } from '@/types';
 import { telHref, whatsappHref } from '@/utils/format';
@@ -66,6 +67,8 @@ export default function ContactPage() {
   });
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [serverError, setServerError] = useState('');
+  const [honeypot, setHoneypot] = useState('');
 
   const set = (key: keyof ContactMessageInput, value: string) => {
     setValues((v) => ({ ...v, [key]: value }));
@@ -82,10 +85,15 @@ export default function ContactPage() {
       return;
     }
     setStatus('sending');
+    setServerError('');
     try {
-      await contactService.send(values);
+      await contactService.send({ ...values, ...(businessSlug ? { businessSlug } : {}) }, honeypot);
       setStatus('sent');
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setErrors(error.fields as Errors);
+        setServerError(error.message);
+      }
       setStatus('error');
     }
   };
@@ -129,10 +137,10 @@ export default function ContactPage() {
                 <span className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
                   <CircleCheck className="size-7" aria-hidden />
                 </span>
-                <h2 className="text-h3 mt-5">Message saved</h2>
+                <h2 className="text-h3 mt-5">{contactService.isRemoteEnabled ? 'Message sent' : 'Message saved'}</h2>
                 <p className="text-body mx-auto mt-2 max-w-md text-navy-600">
                   {contactService.isRemoteEnabled
-                    ? 'Thank you — our team will reply within one working day.'
+                    ? `Thank you — our team will reply to ${values.email} during support hours.`
                     : 'Online messaging isn’t connected yet, so your message is saved in this browser. Send it by email to make sure it reaches us.'}
                 </p>
                 <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -153,8 +161,14 @@ export default function ContactPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={onSubmit} noValidate>
+              <form onSubmit={onSubmit} noValidate className="relative">
                 <h2 className="text-h3">Send a message</h2>
+                <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+                  <label>
+                    Company website
+                    <input type="text" name="company_url" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+                  </label>
+                </div>
                 <p className="text-body-sm mt-1 text-navy-500">
                   Fields marked <span className="text-red-600">*</span> are required.
                 </p>
@@ -185,7 +199,7 @@ export default function ContactPage() {
                 </div>
                 {status === 'error' && (
                   <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
-                    Something went wrong. Please try again or email {site.contact.email}.
+                    {serverError || `Something went wrong. Please try again or email ${site.contact.email}.`}
                   </p>
                 )}
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

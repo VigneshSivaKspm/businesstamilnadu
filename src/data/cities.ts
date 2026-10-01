@@ -1,5 +1,6 @@
-import { slugify } from '@/lib/slug';
-import type { City } from '@/types';
+// Relative value imports keep this file loadable by the API server (Node type stripping has no path aliases).
+import { slugify } from '../lib/slug.ts';
+import type { City } from '../types/index.ts';
 
 /**
  * Cities and towns. These are a separate layer from districts: a district can

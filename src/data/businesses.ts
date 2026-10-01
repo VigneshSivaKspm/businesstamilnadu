@@ -1,6 +1,7 @@
-import { categories } from '@/data/categories';
-import { districts } from '@/data/districts';
-import type { Business, OpeningHours } from '@/types';
+// Relative value imports keep this file loadable by the API server (Node type stripping has no path aliases).
+import { categories } from './categories.ts';
+import { districts } from './districts.ts';
+import type { Business, OpeningHours } from '../types/index.ts';
 
 /**
  * SAMPLE DATA — every business below is fictional and exists only to
